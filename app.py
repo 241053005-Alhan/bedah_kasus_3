@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import os
 
 # ============================================================
@@ -12,35 +13,39 @@ st.set_page_config(
 )
 
 # ============================================================
-# 2. FUNGSI LOAD DATA (PENCARI OTOMATIS)
+# 2. FUNGSI LOAD DATA (OTOMATIS BUAT DATA JIKA KOSONG)
 # ============================================================
 @st.cache_data
 def load_data():
-    # Script ini akan mencari file .csv apa saja di foldernya
-    # Jika Anda punya nama file spesifik, ubah di bawah ini:
-    nama_file = "data_kasus_3.csv" # <-- GANTI dengan nama file CSV Anda nanti
+    nama_file = "data_kasus_3.csv"
     
-    kandidat_path = [
-        nama_file,
-        f"bedah_kasus_3/{nama_file}",
-        "data.csv", "dataset.csv", "data_sintesis.csv" # Opsi cadangan
-    ]
+    # Jika file ada, baca file tersebut
+    if os.path.exists(nama_file):
+        return pd.read_csv(nama_file)
     
-    # Cari file yang benar-benar ada
-    for path in kandidat_path:
-        if os.path.exists(path):
-            return pd.read_csv(path)
-
-    # Jika belum ada file sama sekali
-    st.warning("⚠️ File data CSV belum ditemukan di repository.")
-    st.info("Silakan klik 'Add file' > 'Upload files' di GitHub untuk mengunggah file CSV Anda, lalu sesuaikan nama filenya di dalam kode `app.py` pada variabel `nama_file`.")
-    st.stop()
+    # ==========================================
+    # JIKA FILE TIDAK ADA: BUATKAN DATA OTOMATIS
+    # ==========================================
+    st.info("ℹ️ File CSV belum di-upload. Aplikasi menampilkan **Data Simulasi Otomatis** sementara.")
+    
+    np.random.seed(42)
+    tanggal = pd.date_range(start="2024-01-01", periods=100, freq="D")
+    df_dummy = pd.DataFrame({
+        "Tanggal": tanggal,
+        "Kategori": np.random.choice(["Elektronik", "Pakaian", "Makanan", "Perabot"], 100),
+        "Wilayah": np.random.choice(["Jakarta", "Bandung", "Surabaya", "Medan"], 100),
+        "Jumlah_Terjual": np.random.randint(10, 100, 100),
+        "Pendapatan": np.random.randint(100000, 5000000, 100)
+    })
+    
+    # Simpan ke CSV agar tidak dibuat ulang terus-menerus
+    df_dummy.to_csv(nama_file, index=False)
+    return df_dummy
 
 # Panggil fungsi load data
 df = load_data()
 
 # --- OTOMATISASI TANGGAL ---
-# Jika ada kolom tanggal, ubah ke format datetime agar bisa dibuat grafik tren
 kolom_tanggal = [col for col in df.columns if 'tanggal' in col.lower() or 'date' in col.lower() or 'waktu' in col.lower()]
 if kolom_tanggal:
     df[kolom_tanggal[0]] = pd.to_datetime(df[kolom_tanggal[0]], errors='coerce')
@@ -91,7 +96,7 @@ st.divider()
 st.subheader("📋 Tabel Data")
 st.dataframe(filtered_df, use_container_width=True)
 
-st.subheader("📈 Visualisasi Otomatis")
+st.subheader("📈 Visualisasi Data")
 
 # Visualisasi Time Series jika ada tanggal
 if kolom_tanggal:
@@ -106,7 +111,7 @@ for col in filtered_df.select_dtypes(include=["object", "category"]).columns:
         st.markdown(f"**Distribusi Berdasarkan {col}**")
         st.bar_chart(filtered_df[col].value_counts())
 
-# Visualisasi Angka (Histogram Sederhana)
+# Visualisasi Angka
 num_cols = filtered_df.select_dtypes(include=["number"]).columns.tolist()
 if num_cols:
     kolom_grafik = st.selectbox("Pilih kolom angka untuk melihat sebaran:", num_cols)
